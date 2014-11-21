@@ -10,8 +10,11 @@ if (is_file('config.php') === false) {
 require_once 'config.php';
 
 if (empty($clonePath) === true || is_dir($clonePath) === false) {
-  consoleLog('Directory for $clonePath (' . $clonePath . ') does not exist', 'error');
-  exit;
+  if (mkdir($clonePath) === false) {
+    consoleLog('Directory for $clonePath (' . $clonePath . ') does not exist, and could not be automatically created', 'error');
+    exit;
+  }
+  consoleLog('Created directory for $clonePath (' . $clonePath . ')');
 }
 
 if (empty($sites) === true) {

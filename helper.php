@@ -1,5 +1,9 @@
 <?php
 
+function getConsoleWidth() {
+  return exec('tput cols');
+}
+
 function consoleLog($message, $type = 'info') {
   $prefixTypes = array(
     'error' => "\033[31m[Error]\033[0m ",
@@ -7,10 +11,22 @@ function consoleLog($message, $type = 'info') {
     'success' => "\033[32m[Success]\033[0m ",
     'info' => "\33[34m[Info]\33[0m ",
     'command' => "\33[35m[Command]\33[0m ",
+    'results' => "\33[35m[Results]\33[0m ",
   );
   $prefix = isset($prefixTypes[$type]) ? $prefixTypes[$type] : '';
 
-  echo $prefix, $message, "\n";
+  $width = getConsoleWidth();
+  $prefixWidth = strlen($type) + 3;
+  $prefixIndent = str_pad('', $prefixWidth, ' ');
+  $lineWidth = ($width - $prefixWidth);
+
+  $splitLines = explode("\n", $message);
+  foreach ($splitLines as $i => &$line) {
+    preg_match_all('/(.{1,' . $lineWidth . '})(?:\s+|$)/', $line, $breakLine);
+    $line = $prefixIndent . implode("\n" . $prefixIndent, $breakLine[1]);
+  }
+
+  echo $prefix . substr(implode("\n", $splitLines), $prefixWidth) . "\n";
 }
 
 function execCommand($command, $params = array()) {
@@ -20,7 +36,15 @@ function execCommand($command, $params = array()) {
   consoleLog($command, 'command');
   $output = array();
   $returnVar = 0;
-  exec($command, $output, $returnVar);
+  $overloadedConsoleWidth = 'COLUMNS=' . (getConsoleWidth() - 10) . ' ';
+  $finalCommand = $overloadedConsoleWidth . $command . ' 2>&1';
+  exec($finalCommand, $output, $returnVar);
+
+  // If there was output, render it to the screen
+  if (empty($output) === false) {
+    consoleLog(implode("\n", $output), 'results');
+  }
+
   return array('stdout' => $output, 'return' => $returnVar);
 }
 
