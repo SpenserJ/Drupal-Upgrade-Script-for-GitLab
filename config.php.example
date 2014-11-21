@@ -1,0 +1,5 @@
+<?php
+$clonePath = '/tmp/drupal-upgrade';
+$sites = array(
+  'siteName' => 'git@gitlab.com:organization/repository.git',
+);
