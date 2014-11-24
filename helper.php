@@ -62,3 +62,37 @@ function getCoreVersion() {
   preg_match("/define\('VERSION', '([\d\.]+(?:-\w+)?)'\);/", $bootstrap, $coreVersion);
   return $coreVersion[1];
 }
+
+function getInfoFiles() {
+  $infoFiles = array();
+  $paths = array('sites/all/modules', 'sites/all/themes');
+  foreach ($paths as $path) {
+    if (is_dir($path) === false) { continue; }
+
+    $content = scandir($path);
+    foreach ($content as $moduleName) {
+      $modulePath = $path . '/' . $moduleName;
+      if (is_dir($modulePath) === true &&
+          is_file($modulePath . '/' . $moduleName . '.info') === true) {
+        $infoData = file_get_contents($modulePath . '/' . $moduleName . '.info');
+
+        // Ensure this module came from Drupal.org and is not custom
+        if (stripos($infoData, 'Information added by Drupal.org') === false) {
+          continue;
+        }
+
+        $info = drupal_parse_info_format($infoData);
+        if (preg_match('/^(\d+\.x-)?(\d+)\.(\d+)(?:-(\w+))?.*$/', $info['version'], $matches)) {
+          $info['version_major'] = $matches[2];
+          $info['version_minor'] = $matches[3];
+          if (empty($matches[4]) === false) {
+            $info['version_extra'] = $matches[4];
+          }
+        }
+        $infoFiles[$moduleName] = $info;
+      }
+    }
+  }
+
+  return $infoFiles;
+}

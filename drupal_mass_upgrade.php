@@ -17,6 +17,9 @@ if (empty($clonePath) === true || is_dir($clonePath) === false) {
   consoleLog('Created directory for $clonePath (' . $clonePath . ')');
 }
 
+// Get the common Drupal functions
+require_once $clonePath . '/_drupal_7/includes/common.inc';
+
 if (empty($sites) === true) {
   consoleLog('No sites to upgrade in config.php', 'error');
   exit;
@@ -79,5 +82,60 @@ foreach ($sites as $siteName => $git) {
     ));
   }
 
-  // Execute a drush 
+  $infoFiles = getInfoFiles();
+  foreach ($infoFiles as $moduleName => $moduleInfo) {
+    consoleLog('Checking for security updates for ' . $moduleName);
+    $currentVersion = $moduleInfo['version'];
+    $currentDatestamp = $moduleInfo['datestamp'];
+
+    if (strpos($currentVersion, '-dev') !== false) {
+      consoleLog($moduleName . ' is currently using a dev release. Upgrade this to a stable release immediately!', 'error');
+      continue;
+    }
+
+    $securityRelease = false;
+    try {
+      $releaseXml = simplexml_load_file('http://updates.drupal.org/release-history/' . $moduleName . '/7.x');
+    } catch (Exception $e) {
+      $releaseXml = false;
+    }
+
+    if (isset($releaseXml->releases) === false) {
+      consoleLog('Could not find Drupal.org project for ' . $moduleName, 'error');
+      continue;
+    }
+
+    foreach ($releaseXml->releases->children() as $release) {
+      // If this release is older than the current version, ignore it
+      if ($release->date <= $currentDatestamp) { continue; }
+      // If this release is a dev release, ignore it
+      if (isset($release->version_extra) === true && $release->version_extra == 'dev') {
+        continue;
+      }
+      // If this release is a different major version, ignore it
+      if ($release->version_major != $moduleInfo['version_major']) { continue; }
+
+      // Skip releases that don't have tags
+      if (empty($release->terms) === true) { continue; }
+
+      // Check if this release is a security release
+      foreach ($release->terms->children() as $releaseTerm) {
+        if ($releaseTerm->name != 'Release type') { continue; }
+        if ($releaseTerm->value != 'Security update') { continue; }
+        $securityRelease = $release;
+        break;
+      }
+
+      // If we've found a security release, we don't need to process any more
+      if ($securityRelease !== false) { break; }
+    }
+
+    if ($securityRelease !== false) {
+      $version = $securityRelease->version;
+      consoleLog($moduleName . ' (' . $currentVersion . ') can be updated to ' . $version, 'warning');
+      execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version));
+      execCommand('git add .');
+      execCommand('git commit -m @message', array('@message' => 'Security Update for ' . $moduleName . ' (' . $currentVersion . ') to ' . $version));
+    }
+  }
 }
