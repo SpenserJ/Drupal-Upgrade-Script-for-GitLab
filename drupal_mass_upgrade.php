@@ -58,6 +58,12 @@ foreach ($sites as $siteName => $git) {
     cd($siteName);
   }
 
+  execCommand('git branch -D upgrade_security_release');
+  execCommand('git checkout -b upgrade_security_release');
+
+  // Copy over the settings file, so that we can run drush up commands
+  copy($clonePath . '/_drupal_7/sites/default/settings.php', 'sites/default/settings.php');
+
   // We're now in the $siteName repository
   consoleLog('Repository is ready for updates');
 
