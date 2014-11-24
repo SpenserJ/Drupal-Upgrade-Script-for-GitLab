@@ -22,6 +22,12 @@ if (empty($sites) === true) {
   exit;
 }
 
+// Update base drupal installs
+cd($clonePath . '/_drupal_7');
+consoleLog('Updating Base Drupal 7 site');
+execCommand('drush up --security-only');
+$latestCore = getCoreVersion();
+
 foreach ($sites as $siteName => $git) {
   // Change back to our main clone path
   cd($clonePath);
