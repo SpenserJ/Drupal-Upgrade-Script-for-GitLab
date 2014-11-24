@@ -56,3 +56,9 @@ function cd($path) {
   consoleLog("cd $path", 'command');
   chdir($path);
 }
+
+function getCoreVersion() {
+  $bootstrap = file_get_contents('includes/bootstrap.inc');
+  preg_match("/define\('VERSION', '([\d\.]+(?:-\w+)?)'\);/", $bootstrap, $coreVersion);
+  return $coreVersion[1];
+}

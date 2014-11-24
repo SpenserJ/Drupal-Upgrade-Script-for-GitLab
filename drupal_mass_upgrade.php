@@ -34,7 +34,7 @@ foreach ($sites as $siteName => $git) {
 
   consoleLog("Updating $siteName at $git");
 
-  // If the repository has already been cloned, reset it to head, and pull 
+  // If the repository has already been cloned, reset it to head, and pull
   // latest commits on master
   if (is_dir($siteName) === true) {
     cd($siteName);
@@ -66,6 +66,18 @@ foreach ($sites as $siteName => $git) {
 
   // We're now in the $siteName repository
   consoleLog('Repository is ready for updates');
+  $coreVersion = getCoreVersion();
+  $coreOutdated = version_compare($coreVersion, $latestCore, '<');
+  if ($coreOutdated === true) {
+    $dbUp = '';
+    execCommand('drush upc drupal --security-only -y');
+    consoleLog('Check for any database updates!', 'error');
+    execCommand('git add .');
+    consoleLog('Don\'t forget to fix .htaccess and .gitignore!', 'error');
+    execCommand('git commit -m @message', array(
+      '@message' => 'Updating Drupal Core to ' . $latestCore . $dbUp,
+    ));
+  }
 
   // Execute a drush 
 }
