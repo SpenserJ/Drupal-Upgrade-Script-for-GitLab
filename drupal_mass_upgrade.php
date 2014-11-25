@@ -28,7 +28,7 @@ if (empty($sites) === true) {
 // Update base drupal installs
 cd($clonePath . '/_drupal_7');
 consoleLog('Updating Base Drupal 7 site');
-execCommand('drush up --security-only');
+execCommand('drush up --security-only', array(), false);
 $latestCore = getCoreVersion();
 
 foreach ($sites as $siteName => $git) {
@@ -51,6 +51,7 @@ foreach ($sites as $siteName => $git) {
     $result = execCommand('git checkout master');
     $result = execCommand('git clean -fd');
     $result = execCommand('git pull origin master');
+    execCommand('git branch -D upgrade_security_release');
   } else {
     // If the repository doesn't exist, clone it now
     consoleLog('Cloning repository from remote');
@@ -61,7 +62,6 @@ foreach ($sites as $siteName => $git) {
     cd($siteName);
   }
 
-  execCommand('git branch -D upgrade_security_release');
   execCommand('git checkout -b upgrade_security_release');
 
   // Copy over the settings file, so that we can run drush up commands
@@ -76,7 +76,6 @@ foreach ($sites as $siteName => $git) {
     $diffHtaccess = diffAgainstDrupal($coreVersion, '.htaccess');
 
     execCommand('drush upc drupal --security-only -y', array(), false);
-    consoleLog('Check for any database updates!', 'error');
 
     $dbUp = isCommitDBChange();
     $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
