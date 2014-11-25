@@ -40,7 +40,7 @@ function execCommand($command, $params = array(), $outputCommand = true) {
   }
   if ($outputCommand === true) { consoleLog($command, 'command'); }
   $output = array();
-  $returnVar = 0;
+  $returnVal = 0;
   $overloadedConsoleWidth = 'COLUMNS=' . (getConsoleWidth() - 10) . ' ';
   $tmpOutput = tempnam(sys_get_temp_dir(), 'command-output');
   $finalCommand = $overloadedConsoleWidth . $command . ' > ' . $tmpOutput . ' 2>&1';
@@ -61,6 +61,7 @@ spinner()
     printf "\b\b\b"
   done
   printf "\b\b\b"
+  wait \$!
 }
 
 spinner;
@@ -68,17 +69,19 @@ spinner;
   $spinningCommand = $spinnerCommand . $finalCommand;
   passthru($spinningCommand, $returnVal);
   $output = trim(file_get_contents($tmpOutput));
+  // Clean up the output file
+  unlink($tmpOutput);
 
   // If there was output, render it to the screen
   if (empty($output) === false && $outputCommand !== false) {
-    $type = ($returnVar == 0) ? 'results' : 'resultsFailed';
+    $type = ($returnVal == 0) ? 'results' : 'resultsFailed';
     consoleLog($output, $type);
   }
   $commandEndTime = microtime(true);
   $duration = ($commandEndTime - $commandStartTime) * 1000;
   $tickOffset = ($tickOffset + round($duration / 750)) % 4;
 
-  return array('stdout' => $output, 'return' => $returnVar);
+  return array('stdout' => $output, 'return' => $returnVal);
 }
 
 function cd($path) {
