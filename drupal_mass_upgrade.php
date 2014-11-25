@@ -72,14 +72,29 @@ foreach ($sites as $siteName => $git) {
   $coreVersion = getCoreVersion();
   $coreOutdated = version_compare($coreVersion, $latestCore, '<');
   if ($coreOutdated === true) {
+    $diffGitignore = diffAgainstDrupal($coreVersion, '.gitignore');
+    $diffHtaccess = diffAgainstDrupal($coreVersion, '.htaccess');
+
     $dbUp = '';
     execCommand('drush upc drupal --security-only -y');
     consoleLog('Check for any database updates!', 'error');
     execCommand('git add .');
-    consoleLog('Don\'t forget to fix .htaccess and .gitignore!', 'error');
     execCommand('git commit -m @message', array(
       '@message' => 'Updating Drupal Core to ' . $latestCore . $dbUp,
     ));
+
+    consoleLog('Reapplying custom changes to .gitignore and .htaccess');
+    $result = execCommand('patch -p0 < @diff', array('@diff' => $diffGitignore));
+    if ($result['return'] !== 0) {
+      consoleLog('Patching failed!', 'error');
+      exit;
+    }
+    $result = execCommand('patch -p0 < @diff', array('@diff' => $diffHtaccess));
+    if ($result['return'] !== 0) {
+      consoleLog('Patching failed!', 'error');
+      exit;
+    }
+    execCommand('git add .');
   }
 
   $infoFiles = getInfoFiles();
