@@ -46,7 +46,7 @@ foreach ($sites as $siteName => $git) {
     cd($siteName);
     // If there is no git repository here, throw an error
     if (is_dir('.git') === false) {
-      consoleLog("No git repository found in $sitename. Please delete this folder and try again.", 'error');
+      consoleLog("No git repository found in $siteName. Please delete this folder and try again.", 'error');
       continue;
     }
     execCommand('git reset --hard HEAD', array(), false);
