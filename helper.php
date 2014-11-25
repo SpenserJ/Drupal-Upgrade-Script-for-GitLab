@@ -116,3 +116,11 @@ function diffAgainstDrupal($version, $file) {
 
   return $tempDiff;
 }
+
+function isCommitDBChange() {
+  $diff = execCommand('git diff', array(), false);
+  $diff = implode("\n", $diff['stdout']);
+  preg_match_all('/function\s+.+_update_\d{4}\s*\(/', $diff, $updates);
+  $totalUpdates = count($updates[0]);
+  return ($totalUpdates === 0) ? false : $totalUpdates;
+}

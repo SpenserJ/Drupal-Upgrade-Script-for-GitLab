@@ -75,13 +75,17 @@ foreach ($sites as $siteName => $git) {
     $diffGitignore = diffAgainstDrupal($coreVersion, '.gitignore');
     $diffHtaccess = diffAgainstDrupal($coreVersion, '.htaccess');
 
-    $dbUp = '';
-    execCommand('drush upc drupal --security-only -y');
+    execCommand('drush upc drupal --security-only -y', array(), false);
     consoleLog('Check for any database updates!', 'error');
+
+    $dbUp = isCommitDBChange();
+    $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
+
     execCommand('git add .');
     execCommand('git commit -m @message', array(
-      '@message' => 'Updating Drupal Core to ' . $latestCore . $dbUp,
-    ));
+      '@message' => 'Security update for Drupal (' . $coreVersion . ') to ' .
+        $latestCore . $dbUp,
+    ), false);
 
     consoleLog('Reapplying custom changes to .gitignore and .htaccess');
     $result = execCommand('patch -p0 < @diff', array('@diff' => $diffGitignore));
@@ -95,11 +99,11 @@ foreach ($sites as $siteName => $git) {
       exit;
     }
     execCommand('git add .');
+    execCommand('git commit -m @message', array('@message' => 'Reapplying changes to .gitignore and .htaccess'), false);
   }
 
   $infoFiles = getInfoFiles();
   foreach ($infoFiles as $moduleName => $moduleInfo) {
-    consoleLog('Checking for security updates for ' . $moduleName);
     $currentVersion = $moduleInfo['version'];
     $currentDatestamp = $moduleInfo['datestamp'];
 
@@ -147,10 +151,14 @@ foreach ($sites as $siteName => $git) {
 
     if ($securityRelease !== false) {
       $version = $securityRelease->version;
-      consoleLog($moduleName . ' (' . $currentVersion . ') can be updated to ' . $version, 'warning');
-      execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version));
+      consoleLog($moduleName . ' (' . $currentVersion . ') can be updated to ' . $version, 'info');
+      execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version), false);
+      $dbUp = isCommitDBChange();
+      $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
       execCommand('git add .');
-      execCommand('git commit -m @message', array('@message' => 'Security Update for ' . $moduleName . ' (' . $currentVersion . ') to ' . $version));
+      $message = 'Security Update for ' . $moduleInfo['name'] . ' (' .
+        $currentVersion . ') to ' . $version . $dbUp;
+      execCommand('git commit -m @message', array('@message' => $message), false);
     }
   }
 }
