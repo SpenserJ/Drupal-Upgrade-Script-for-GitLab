@@ -31,7 +31,10 @@ function consoleLog($message, $type = 'info') {
   echo $prefix . substr(implode("\n", $splitLines), $prefixWidth) . "\n";
 }
 
+$tickOffset = 0;
 function execCommand($command, $params = array(), $outputCommand = true) {
+  global $tickOffset;
+
   foreach ($params as $key => $value) {
     $command = str_replace($key, escapeshellarg($value), $command);
   }
@@ -39,14 +42,41 @@ function execCommand($command, $params = array(), $outputCommand = true) {
   $output = array();
   $returnVar = 0;
   $overloadedConsoleWidth = 'COLUMNS=' . (getConsoleWidth() - 10) . ' ';
-  $finalCommand = $overloadedConsoleWidth . $command . ' 2>&1';
-  exec($finalCommand, $output, $returnVar);
+  $tmpOutput = tempnam(sys_get_temp_dir(), 'command-output');
+  $finalCommand = $overloadedConsoleWidth . $command . ' > ' . $tmpOutput . ' 2>&1';
+  $commandStartTime = microtime(true);
+  $spinnerSymbol = '/-\\|';
+  $spinnerSymbol = substr($spinnerSymbol, $tickOffset) . substr($spinnerSymbol, 0, $tickOffset);
+  $spinnerCommand = <<<spinner
+spinner()
+{
+  local pid=\$1
+  local delay=0.75
+  local spinstr='$spinnerSymbol'
+  while [ "\$(ps a | awk '{print \$1}' | grep -w \$pid)" ]; do
+    local temp=\${spinstr#?}
+    printf "[%c]" "\$spinstr"
+    local spinstr=\$temp\${spinstr%"\$temp"}
+    sleep \$delay
+    printf "\b\b\b"
+  done
+  printf "\b\b\b"
+}
+
+spinner;
+  $finalCommand .= ' & spinner $!';
+  $spinningCommand = $spinnerCommand . $finalCommand;
+  passthru($spinningCommand, $returnVal);
+  $output = trim(file_get_contents($tmpOutput));
 
   // If there was output, render it to the screen
   if (empty($output) === false && $outputCommand !== false) {
     $type = ($returnVar == 0) ? 'results' : 'resultsFailed';
-    consoleLog(implode("\n", $output), $type);
+    consoleLog($output, $type);
   }
+  $commandEndTime = microtime(true);
+  $duration = ($commandEndTime - $commandStartTime) * 1000;
+  $tickOffset = ($tickOffset + round($duration / 750)) % 4;
 
   return array('stdout' => $output, 'return' => $returnVar);
 }
@@ -110,7 +140,6 @@ function diffAgainstDrupal($version, $file) {
   fclose($fpTemp);
   $diff = execCommand('diff -U 3 @original @filename', array('@filename' => $file, '@original' => $tempFilename), false);
   $diff = $diff['stdout'];
-  $diff = implode("\n", $diff);
   if (empty($diff) === false) { $diff .= "\n"; }
   $tempDiff = tempnam(sys_get_temp_dir(), 'diff-' . $file);
   $fpDiff = fopen($tempDiff, 'w');
