@@ -83,16 +83,8 @@ foreach ($sites as $siteName => $git) {
     gitCommitAll('Security update for Drupal (' . $coreVersion . ') to ' .  $latestCore . $dbUp);
 
     consoleLog('Reapplying custom changes to .gitignore and .htaccess');
-    $result = execCommand('patch -p0 < @diff', array('@diff' => $diffGitignore));
-    if ($result['return'] !== 0) {
-      consoleLog('Patching failed!', 'error');
-      exit;
-    }
-    $result = execCommand('patch -p0 < @diff', array('@diff' => $diffHtaccess));
-    if ($result['return'] !== 0) {
-      consoleLog('Patching failed!', 'error');
-      exit;
-    }
+    applyPatch($diffGitignore);
+    applyPatch($diffHtaccess);
     gitCommitAll('Reapplying changes to .gitignore and .htaccess');
   }
 

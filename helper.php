@@ -143,13 +143,44 @@ function diffAgainstDrupal($version, $file) {
   fclose($fpTemp);
   $diff = execCommand('diff -U 3 @original @filename', array('@filename' => $file, '@original' => $tempFilename), false);
   $diff = $diff['stdout'];
+  // Remove the "potentially dangerous file name" from the patch
+  $diff = str_replace(sys_get_temp_dir() . '/', '', $diff);
   if (empty($diff) === false) { $diff .= "\n"; }
+
   $tempDiff = tempnam(sys_get_temp_dir(), 'diff-' . $file);
   $fpDiff = fopen($tempDiff, 'w');
   fwrite($fpDiff, $diff);
   fclose($fpDiff);
 
   return $tempDiff;
+}
+
+function applyPatch($patch) {
+  $result = execCommand('patch -p0 < @diff', array('@diff' => $patch));
+
+  $patchComplete = true;
+  if ($result['return'] !== 0) {
+    consoleLog('Patching failed! Please apply the patch (' . $patch . ') ' .
+      ' manually before continuing.', 'error');
+    $patchComplete = false;
+  }
+
+  $badFiles = scanFilesMask('{^.*\.(?:orig|rej)$}');
+
+  while ($patchComplete === false || count($badFiles) > 0) {
+    // Set this to true, since we can't confirm if the patch was applied cleanly
+    $patchComplete = true;
+    if (count($badFiles) > 0) {
+      $message = 'Found .rej or .orig files from a failed patch. Please ' .
+        "delete these before continuing:\n" . implode("\n", $badFiles);
+      consoleLog($message, 'error');
+    }
+    readline('Press enter when the patches have been properly applied.');
+    $badFiles = scanFilesMask('{^.*\.(?:orig|rej)$}');
+  }
+
+  // Delete the patch file after we've applied it
+  unlink($patch);
 }
 
 function isCommitDBChange() {
@@ -163,4 +194,21 @@ function isCommitDBChange() {
 function gitCommitAll($message) {
   execCommand('git add .', array(), false);
   execCommand('git commit -m @message', array('@message' => $message), false);
+}
+
+function scanFilesMask($mask, $dir = '.') {
+  $result = array();
+
+  foreach (scandir($dir) as $f) {
+    // Ignore . and ..
+    if ($f === '.' || $f === '..') { continue; }
+
+    if (is_dir("$dir/$f") === true) {
+      $result = array_merge($result, scanFilesMask($mask, "$dir/$f"));
+    } else {
+      if (preg_match($mask, $f) === 1) { $result[] = $dir . '/' . $f; }
+    }
+  }
+
+  return $result;
 }
