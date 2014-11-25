@@ -32,6 +32,9 @@ execCommand('drush up --security-only', array(), false);
 $latestCore = getCoreVersion();
 
 foreach ($sites as $siteName => $git) {
+  // Display a divider to make each site easier to distinguish
+  displayDivider();
+
   // Change back to our main clone path
   cd($clonePath);
 
@@ -46,29 +49,26 @@ foreach ($sites as $siteName => $git) {
       consoleLog("No git repository found in $sitename. Please delete this folder and try again.", 'error');
       continue;
     }
-    consoleLog('Resetting and pulling repository to latest master');
-    $result = execCommand('git reset --hard HEAD');
-    $result = execCommand('git checkout master');
-    $result = execCommand('git clean -fd');
-    $result = execCommand('git pull origin master');
-    execCommand('git branch -D upgrade_security_release');
+    execCommand('git reset --hard HEAD', array(), false);
+    execCommand('git checkout master', array(), false);
+    execCommand('git clean -fd', array(), false);
+    execCommand('git pull origin master', array(), false);
+    execCommand('git branch -D upgrade_security_release', array(), false);
   } else {
     // If the repository doesn't exist, clone it now
-    consoleLog('Cloning repository from remote');
     $result = execCommand('git clone @git @siteName', array(
       '@git' => $git,
       '@siteName' => $siteName,
-    ));
+    ), array(), false);
     cd($siteName);
   }
 
-  execCommand('git checkout -b upgrade_security_release');
+  execCommand('git checkout -b upgrade_security_release', array(), false);
 
   // Copy over the settings file, so that we can run drush up commands
   copy($clonePath . '/_drupal_7/sites/default/settings.php', 'sites/default/settings.php');
 
-  // We're now in the $siteName repository
-  consoleLog('Repository is ready for updates');
+  // Check if we need to do a core update
   $coreVersion = getCoreVersion();
   $coreOutdated = version_compare($coreVersion, $latestCore, '<');
   if ($coreOutdated === true) {
@@ -80,11 +80,7 @@ foreach ($sites as $siteName => $git) {
     $dbUp = isCommitDBChange();
     $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
 
-    execCommand('git add .');
-    execCommand('git commit -m @message', array(
-      '@message' => 'Security update for Drupal (' . $coreVersion . ') to ' .
-        $latestCore . $dbUp,
-    ), false);
+    gitCommitAll('Security update for Drupal (' . $coreVersion . ') to ' .  $latestCore . $dbUp);
 
     consoleLog('Reapplying custom changes to .gitignore and .htaccess');
     $result = execCommand('patch -p0 < @diff', array('@diff' => $diffGitignore));
@@ -97,8 +93,7 @@ foreach ($sites as $siteName => $git) {
       consoleLog('Patching failed!', 'error');
       exit;
     }
-    execCommand('git add .');
-    execCommand('git commit -m @message', array('@message' => 'Reapplying changes to .gitignore and .htaccess'), false);
+    gitCommitAll('Reapplying changes to .gitignore and .htaccess');
   }
 
   $infoFiles = getInfoFiles();
@@ -150,14 +145,12 @@ foreach ($sites as $siteName => $git) {
 
     if ($securityRelease !== false) {
       $version = $securityRelease->version;
-      consoleLog($moduleName . ' (' . $currentVersion . ') can be updated to ' . $version, 'info');
+      consoleLog($moduleInfo['name'] . ' (' . $currentVersion . ') can be updated to ' . $version, 'info');
       execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version), false);
       $dbUp = isCommitDBChange();
       $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
-      execCommand('git add .');
-      $message = 'Security Update for ' . $moduleInfo['name'] . ' (' .
-        $currentVersion . ') to ' . $version . $dbUp;
-      execCommand('git commit -m @message', array('@message' => $message), false);
+      gitCommitAll('Security Update for ' . $moduleInfo['name'] . ' (' .
+        $currentVersion . ') to ' . $version . $dbUp);
     }
   }
 }

@@ -31,11 +31,11 @@ function consoleLog($message, $type = 'info') {
   echo $prefix . substr(implode("\n", $splitLines), $prefixWidth) . "\n";
 }
 
-function execCommand($command, $params = array(), $outputResults = true) {
+function execCommand($command, $params = array(), $outputCommand = true) {
   foreach ($params as $key => $value) {
     $command = str_replace($key, escapeshellarg($value), $command);
   }
-  consoleLog($command, 'command');
+  if ($outputCommand === true) { consoleLog($command, 'command'); }
   $output = array();
   $returnVar = 0;
   $overloadedConsoleWidth = 'COLUMNS=' . (getConsoleWidth() - 10) . ' ';
@@ -43,7 +43,7 @@ function execCommand($command, $params = array(), $outputResults = true) {
   exec($finalCommand, $output, $returnVar);
 
   // If there was output, render it to the screen
-  if (empty($output) === false && $outputResults !== false) {
+  if (empty($output) === false && $outputCommand !== false) {
     $type = ($returnVar == 0) ? 'results' : 'resultsFailed';
     consoleLog(implode("\n", $output), $type);
   }
@@ -56,8 +56,11 @@ function cd($path) {
     consoleLog("Could not cd into $path", 'error');
     exit;
   }
-  consoleLog("cd $path", 'command');
   chdir($path);
+}
+
+function displayDivider() {
+  echo "   \n", str_pad('', getConsoleWidth(), '-'), "\n\n";
 }
 
 function getCoreVersion() {
@@ -119,8 +122,13 @@ function diffAgainstDrupal($version, $file) {
 
 function isCommitDBChange() {
   $diff = execCommand('git diff', array(), false);
-  $diff = implode("\n", $diff['stdout']);
+  $diff = $diff['stdout'];
   preg_match_all('/function\s+.+_update_\d{4}\s*\(/', $diff, $updates);
   $totalUpdates = count($updates[0]);
   return ($totalUpdates === 0) ? false : $totalUpdates;
+}
+
+function gitCommitAll($message) {
+  execCommand('git add .', array(), false);
+  execCommand('git commit -m @message', array('@message' => $message), false);
 }
