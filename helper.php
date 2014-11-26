@@ -4,7 +4,9 @@ function getConsoleWidth() {
   return exec('tput cols');
 }
 
+$siteOutput = array();
 function consoleLog($message, $type = 'info') {
+  global $siteOutput;
   $prefixTypes = array(
     'error' => "\033[31m[Error]\033[0m ",
     'warning' => "\033[33m[Warning]\033[0m ",
@@ -17,7 +19,7 @@ function consoleLog($message, $type = 'info') {
   $prefix = isset($prefixTypes[$type]) ? $prefixTypes[$type] : '';
   if ($type === 'resultsFailed') { $type = 'results'; }
 
-  $width = getConsoleWidth();
+  $width = min(getConsoleWidth(), 120);
   $prefixWidth = strlen($type) + 3;
   $prefixIndent = str_pad('', $prefixWidth, ' ');
   $lineWidth = ($width - $prefixWidth);
@@ -28,7 +30,9 @@ function consoleLog($message, $type = 'info') {
     $line = $prefixIndent . implode("\n" . $prefixIndent, $breakLine[1]);
   }
 
-  echo $prefix . substr(implode("\n", $splitLines), $prefixWidth) . "\n";
+  $message = $prefix . substr(implode("\n", $splitLines), $prefixWidth) . "\n";
+  $siteOutput[] = trim($message);
+  echo $message;
 }
 
 $tickOffset = 0;
@@ -93,7 +97,14 @@ function cd($path) {
 }
 
 function displayDivider() {
+  global $siteOutput;
+  $siteOutput = array();
   echo "   \n", str_pad('', getConsoleWidth(), '-'), "\n\n";
+}
+
+function getSiteOutput() {
+  global $siteOutput;
+  return $siteOutput;
 }
 
 function getCoreVersion() {
