@@ -70,17 +70,23 @@ foreach ($sites as $siteName => $git) {
     cd($siteName);
   }
 
+  // We only support Drupal 7 at the moment
+  $coreVersion = getCoreVersion();
+  if ($coreVersion === false || $coreVersion['major'] != '7') {
+    consoleLog('Cannot update ' . $siteName . ' - Upgrade script only supports Drupal 7 sites', 'error');
+    continue;
+  }
+
   execCommand('git checkout -b upgrade_security_release', array(), false);
 
   // Copy over the settings file, so that we can run drush up commands
   copy($clonePath . '/_drupal_7/sites/default/settings.php', 'sites/default/settings.php');
 
   // Check if we need to do a core update
-  $coreVersion = getCoreVersion();
-  $coreOutdated = version_compare($coreVersion, $latestCore, '<');
+  $coreOutdated = version_compare($coreVersion['full'], $latestCore['full'], '<');
   if ($coreOutdated === true) {
-    $diffGitignore = diffAgainstDrupal($coreVersion, '.gitignore');
-    $diffHtaccess = diffAgainstDrupal($coreVersion, '.htaccess');
+    $diffGitignore = diffAgainstDrupal($coreVersion['full'], '.gitignore');
+    $diffHtaccess = diffAgainstDrupal($coreVersion['full'], '.htaccess');
 
     execCommand('drush upc drupal --security-only -y', array(), false);
 
@@ -91,8 +97,8 @@ foreach ($sites as $siteName => $git) {
       $dbUp = ' [' . $dbUp . ' DB Updates]';
     }
 
-    $coreCommit = $message = 'Security update for Drupal ' . $coreVersion .
-      ' to ' .  $latestCore . $dbUp;
+    $coreCommit = $message = 'Security update for Drupal ' .
+      $coreVersion['full'] . ' to ' .  $latestCore['full'] . $dbUp;
     gitCommitAll($message);
 
     consoleLog('Reapplying custom changes to .gitignore and .htaccess');
@@ -133,7 +139,7 @@ foreach ($sites as $siteName => $git) {
         continue;
       }
       // If this release is a different major version, ignore it
-      if ($release->version_major != $moduleInfo['version_major']) { continue; }
+      if ($release->version_major != $moduleInfo['version_parsed']['major']) { continue; }
 
       // Skip releases that don't have tags
       if (empty($release->terms) === true) { continue; }
@@ -152,7 +158,7 @@ foreach ($sites as $siteName => $git) {
 
     if ($securityRelease !== false) {
       $version = $securityRelease->version;
-      consoleLog($moduleInfo['name'] . ' (' . $currentVersion . ') can be updated to ' . $version, 'info');
+      consoleLog($moduleInfo['name'] . ' ' . $currentVersion . ' can be updated to ' . $version, 'info');
       execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version), false);
       $dbUp = isCommitDBChange();
       if ($dbUp === false) { $dbUp = ''; }

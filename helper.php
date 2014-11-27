@@ -110,7 +110,8 @@ function getSiteOutput() {
 function getCoreVersion() {
   $bootstrap = file_get_contents('includes/bootstrap.inc');
   preg_match("/define\('VERSION', '([\d\.]+(?:-\w+)?)'\);/", $bootstrap, $coreVersion);
-  return $coreVersion[1];
+  if (empty($coreVersion[1]) === true) { return false; }
+  return parseVersion($coreVersion[1]);
 }
 
 function getInfoFiles() {
@@ -132,12 +133,8 @@ function getInfoFiles() {
         }
 
         $info = drupal_parse_info_format($infoData);
-        if (preg_match('/^(\d+\.x-)?(\d+)\.(\d+)(?:-(\w+))?.*$/', $info['version'], $matches)) {
-          $info['version_major'] = $matches[2];
-          $info['version_minor'] = $matches[3];
-          if (empty($matches[4]) === false) {
-            $info['version_extra'] = $matches[4];
-          }
+        if (($parsedVersion = parseVersion($info['version'])) !== false) {
+          $info['version_parsed'] = $parsedVersion;
         }
         $infoFiles[$moduleName] = $info;
       }
@@ -145,6 +142,20 @@ function getInfoFiles() {
   }
 
   return $infoFiles;
+}
+
+function parseVersion($version) {
+  $parsed = false;
+  if (preg_match('/^(\d+\.x-)?(\d+)\.(\d+)(?:-(\w+))?.*$/', $version, $matches)) {
+    $parsed = array(
+      'full' => $matches[0],
+      'major' => $matches[2],
+      'minor' => $matches[3],
+    );
+    if (empty($matches[1]) === false) { $parsed['core']  = $matches[1]; }
+    if (empty($matches[4]) === false) { $parsed['extra'] = $matches[4]; }
+  }
+  return $parsed;
 }
 
 function diffAgainstDrupal($version, $file) {
