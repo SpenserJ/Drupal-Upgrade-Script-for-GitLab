@@ -1,0 +1,12 @@
+{
+    "name": "spenser/drupal-upgrade",
+    "require": {
+        "m4tthumphrey/php-gitlab-api": "dev-master"
+    },
+    "authors": [
+        {
+            "name": "Spenser Jones",
+            "email": "hello@spenserj.com"
+        }
+    ]
+}
