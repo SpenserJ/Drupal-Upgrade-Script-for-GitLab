@@ -8,6 +8,8 @@ if (is_file('config.php') === false) {
 }
 
 require_once 'config.php';
+require_once 'git.php';
+require_once 'vendor/autoload.php';
 
 if (empty($clonePath) === true || is_dir($clonePath) === false) {
   if (mkdir($clonePath) === false) {
@@ -37,6 +39,11 @@ foreach ($sites as $siteName => $git) {
 
   // Change back to our main clone path
   cd($clonePath);
+
+  $totalDBUpdates = 0;
+  $coreCommit = false;
+  $moduleCommits = array();
+  $devModules = array();
 
   consoleLog("Updating $siteName at $git");
 
@@ -78,9 +85,15 @@ foreach ($sites as $siteName => $git) {
     execCommand('drush upc drupal --security-only -y', array(), false);
 
     $dbUp = isCommitDBChange();
-    $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
+    if ($dbUp === false) { $dbUp = ''; }
+    else {
+      $totalDBUpdates += $dbUp;
+      $dbUp = ' [' . $dbUp . ' DB Updates]';
+    }
 
-    gitCommitAll('Security update for Drupal (' . $coreVersion . ') to ' .  $latestCore . $dbUp);
+    $coreCommit = $message = 'Security update for Drupal ' . $coreVersion .
+      ' to ' .  $latestCore . $dbUp;
+    gitCommitAll($message);
 
     consoleLog('Reapplying custom changes to .gitignore and .htaccess');
     applyPatch($diffGitignore);
@@ -94,7 +107,9 @@ foreach ($sites as $siteName => $git) {
     $currentDatestamp = $moduleInfo['datestamp'];
 
     if (strpos($currentVersion, '-dev') !== false) {
-      consoleLog($moduleName . ' is currently using a dev release. Upgrade this to a stable release immediately!', 'error');
+      $devModules[] = $moduleInfo['name'] . ' ' . $currentVersion;
+      consoleLog($moduleInfo['name'] . ' ' . $currentVersion . ' is currently ' .
+        'using a dev release. Upgrade this to a stable release immediately!', 'error');
       continue;
     }
 
@@ -140,9 +155,51 @@ foreach ($sites as $siteName => $git) {
       consoleLog($moduleInfo['name'] . ' (' . $currentVersion . ') can be updated to ' . $version, 'info');
       execCommand('drush dl @moduleVersion -y', array('@moduleVersion' => $moduleName . '-' . $version), false);
       $dbUp = isCommitDBChange();
-      $dbUp = ($dbUp === false) ? '' : ' [' . $dbUp . ' DB Updates]';
-      gitCommitAll('Security Update for ' . $moduleInfo['name'] . ' (' .
-        $currentVersion . ') to ' . $version . $dbUp);
+      if ($dbUp === false) { $dbUp = ''; }
+      else {
+        $totalDBUpdates += $dbUp;
+        $dbUp = ' [' . $dbUp . ' DB Updates]';
+      }
+      $moduleCommits[] = $message = 'Security update for ' .
+        $moduleInfo['name'] . ' ' . $currentVersion . ' to ' . $version . $dbUp;
+      gitCommitAll($message);
     }
   }
+
+  // If nothing has been done, skip the push and merge request
+  if ($coreCommit === false && empty($moduleCommits) === true) {
+    continue;
+  }
+
+  execCommand('git push -f origin upgrade_security_release', array(), false);
+
+  $mergeBody = array();
+
+  if ($coreCommit !== false) {
+    $mergeBody[] = "### Core Update\n\n* " . $coreCommit;
+  }
+
+  if (empty($moduleCommits) === false) {
+    $mergeBody[] = "### Module Updates\n\n* " . implode("\n* ", $moduleCommits);
+  }
+
+  if (empty($devModules) === false) {
+    $mergeBody[] = '### :-1: Modules running development releases - ' .
+      "Update these to stable immediately! :-1:\n\n* " .
+      implode("\n* ", $devModules);
+  }
+
+  $mergeBody[] = "### Output\n\n    " . implode("\n    ", str_replace("\n", "\n    ", getSiteOutput()));
+
+  $dbUpdates = ($totalDBUpdates === 0) ? '' : ' [' . $totalDBUpdates . ' DB Updates]';
+
+  preg_match('{:(.+)\.git$}', $git, $siteProjectName);
+  $siteProjectName = $siteProjectName[1];
+  createMergeRequest(
+    $siteProjectName,
+    'upgrade_security_release',
+    'master',
+    'Upgrade Security Release' . $dbUpdates,
+    implode("\n\n", $mergeBody)
+  );
 }
