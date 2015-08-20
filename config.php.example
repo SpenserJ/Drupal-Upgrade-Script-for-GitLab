@@ -1,4 +1,5 @@
 <?php
+$gitlabToken = 'gitlab-token'; //https://gitlab.com/profile/account
 $clonePath = '/tmp/drupal-upgrade';
 $sites = array(
   'siteName' => 'git@gitlab.com:organization/repository.git',
