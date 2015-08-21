@@ -116,7 +116,7 @@ function getCoreVersion() {
 
 function getInfoFiles() {
   $infoFiles = array();
-  $paths = array('sites/all/modules', 'sites/all/themes');
+  $paths = array('sites/all/modules', 'sites/all/modules/contrib', 'sites/all/themes');
   foreach ($paths as $path) {
     if (is_dir($path) === false) { continue; }
 
