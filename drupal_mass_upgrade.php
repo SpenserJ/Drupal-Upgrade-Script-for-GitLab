@@ -134,6 +134,8 @@ foreach ($sites as $siteName => $git) {
     foreach ($releaseXml->releases->children() as $release) {
       // If this release is older than the current version, ignore it
       if ($release->date <= $currentDatestamp) { continue; }
+      // If this release is the same version, ignore it.
+      if ((string)$release->version === $currentVersion) { continue; }
       // If this release is a dev release, ignore it
       if (isset($release->version_extra) === true && $release->version_extra == 'dev') {
         continue;
